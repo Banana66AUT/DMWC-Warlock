@@ -1054,12 +1054,12 @@ function AutoSwichDelay()
 				end
 			end
 		elseif newBGInstance == "none" then
-			if (HUD.PVE_PVP == 3 and SetSwichDUNout) or (HUD.PVE_PVP == 3 and SetSwichPVPout) then
+			if (HUD.PVE_PVP == 3 and SetSwichDUNout) or (HUD.PVE_PVP == 2 and SetSwichPVPout) then
 				if HUD.PVE_PVP ~= 1 then
 					HUD.PVE_PVP = 1
 					DMWHUDPVE_PVP:Toggle(1)
 					if Pet and not Pet.Dead then
-						if Setting("PVP Pet") ~= Setting("PVE Pet") then RunMacroText("/petdismiss") end
+						if Setting("PVP Pet") ~= Setting("PVE Pet") or ("DUN Pet") ~= Setting("PVE Pet") then RunMacroText("/petdismiss") end
 					end
 				end
 			end
