@@ -1,0 +1,10 @@
+## Interface: 11307
+## Title: DoMeWhen Classic - Warlock
+## Author: feskee reworked by Banana66AUT
+## Version: v1.0
+## Notes: Warlock Rotation for DoMeWhen Classic 
+## DefaultState: Disabled
+## Dependencies: DoMeWhen-Classic
+
+Settings.lua
+Rotation.lua
