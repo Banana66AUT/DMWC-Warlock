@@ -668,7 +668,7 @@ local function OOC()
         end
 		
 		-- Dark Pact OOC
-		if Pet and not Pet.Dead and SetManDPCOOCyn and not Player.Moving and Player.PowerPct <= SetManDOCPLmp and PetManaPct > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then oocdebug("Dark Pact OOC") mmdebug("Dark Pact OOC") return true end
+		if Pet and not Pet.Dead and SetManDPCOOCyn and not Player.Moving and Player.PowerPct <= SetManDOCPLmp and Pet:PowerPct() > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then oocdebug("Dark Pact OOC") mmdebug("Dark Pact OOC") return true end
 		
 		-- Life Tap OOC
         if SetManLITOOCyn and not Player.Moving and Player.HP >= SetManLIThp and Player.PowerPct <= SetManLITmp and Spell.LifeTap:Cast(Player) then oocdebug("Life Tap OOC") mmdebug("Life Tap OOC") return true end
