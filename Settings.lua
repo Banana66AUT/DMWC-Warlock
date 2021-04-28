@@ -47,10 +47,23 @@ function Warlock.Settings()
 	UI.AddHeader("schadis/DMWC - Buff Sniper integrated")
 	UI.AddHeader("https://github.com/schadis")
 	
+	-- Test Menue
+	UI.AddTab("Specials")
+	UI.AddHeader("Looting")
+	UI.AddBlank(true)
+	UI.AddToggle("Mass Loot","Do a Mass loot 5 yards around the Player", false, false)
+	UI.AddToggle("Fast Loot","Activate a Faster-Looting-System, helps on looting problems", true, false)
+	UI.AddBlank(true)
+	UI.AddBlank(true)
+	UI.AddHeader("Addon Support")
+	UI.AddBlank(true)
+	UI.AddToggle("Zygor Auto Talent Advisor","Automatic lerning Talent on Zygor Talent Advisor", false, false)
+	UI.AddBlank(true)
+	UI.AddBlank(true)
 	
 	--
 	--Auto Swich
-	UI.AddHeader(" ")
+	UI.AddTab(" ")
 	UI.AddTab("Auto Swich")
 	UI.AddHeader("Auto Swich")
 	UI.AddBlank(true)

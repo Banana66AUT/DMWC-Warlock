@@ -6,7 +6,7 @@ local DMW = DMW
 local Warlock = DMW.Rotations.WARLOCK
 local Rotation = DMW.Helpers.Rotation
 local Setting = DMW.Helpers.Rotation.Setting
-local Player, Pet, Buff, Debuff, Health, Spell, Target, Talent, Item, GCD, GCDRemain, CDs, HUD, Friends40Y, Friends40YC, Enemies20Y, Enemies20YC, Enemies30Y, Enemies30YC, Enemies40Y, Enemies40YC
+local Player, Pet, PetMana, PetManaPct, Buff, Debuff, Health, Spell, Target, Talent, Item, GCD, GCDRemain, CDs, HUD, Friends40Y, Friends40YC, Enemies20Y, Enemies20YC, Enemies30Y, Enemies30YC, Enemies40Y, Enemies40YC
 local Attackable40Y, Attackable40YC, PVPTarget, NewTarget, ShardCount, Curse, Opener, CurrentSpell
 local DefenseDrainLife = 0
 local DefenseHFunnel = 0
@@ -22,7 +22,14 @@ local BGInstance = "none"
 local newBGInstance
 local PlusTime = 0
 local startDelayYN = 0
-
+local Random = 0
+local PlayerLevel = UnitLevel("player")-1
+local OCCTime = GetTime()
+local TestVar, SetFastLoot, SetMassLoot
+local LootDL = 0
+local DEBOUNCE_INTERVAL = 0.3
+local PrintTextTest = " "
+local PTTOld = " "
 
 local SetGenAutoBuff, SetGenBUFdbPVE, SetGenBUFdbPVP, SetGenBUFdbDUN, SetGenBUFubPVE, SetGenBUFubPVP, SetGenBUFubDUN, SetGenBUFdiPVE, SetGenBUFdiPVP, SetGenBUFdiDUN, SetGenWand, SetGenAAMelee, SetGenAutoTarget, SetGenAutoTQU, PVEP, SetBSnTarPVP, SetBSnZG, SetBSnWCB, SetBSnONYNEF	
 local SetPetPET, SetPetAutoAttack, SetPetHFUyn, SetPetHFUhp, SetPetSACyn, SetPetSACplhp, SetPetSACpehp 
@@ -30,6 +37,7 @@ local SetDefCHSTyn, SetDefUHSTyn, SetDefUHSThp, SetDefUHPOyn, SetDefUHPOhp, SetD
 local SetManLITyn, SetManLITOOCyn, SetManLITmp, SetManLIThp, SetManLITSAFEyn, SetManELITyn, SetManELITmp, SetManELIThp, SetManDPCyn, SetManDPCOOCyn, SetManDOCPLmp, SetManDOCPEmp, SetManUMPOyn, SetManUMPOmp
 local SetDpsSHB, SetDpsSHBmp, SetDpsSPAyn, SetDpsSFyn, SetDpsMDOli, SetDpsCurse, SetDpsCurseCYyn, SetDpsAMPyn, SetDpsCORyn, SetDpsCORCYyn, SetDpsCORCYr1, SetDpsIMMyn, SetDpsIMMCYyn, SetDpsSLIyn, SetDpsSLICYyn, SetDpsSBUyn 
 local SetDpsSBUttd, SetDpsSBUhp, SetDpsDLIFIyn, SetDpsDLIFIhp, SetDpsDSSyn, SetDpsDSSms, SetDpsDSSad, SetDpsDSSsp
+
 
 
 
@@ -154,7 +162,7 @@ local function GetCurse()
 end
 
 
--- Settings General
+-- Startup Delay
 -- OK (Locals)
 local function ReadSetupStartDelay()
 	SetStartDelay = Setting("Startup Delay")
@@ -172,7 +180,6 @@ end
 
 
 
-
 -- Settings General
 -- OK (Locals)
 local function ReadSetupGEN()
@@ -180,7 +187,6 @@ local function ReadSetupGEN()
 	SetBSnZG = Setting("ZG") 
 	SetBSnWCB = Setting("WCB") 
 	SetBSnONYNEF = Setting("Ony_Nef")
-	
 	
 	SetGenWand = Setting(PVEP.."Use Wand") or false
 	SetGenAAMelee = Setting(PVEP.."Auto Attack In Melee") or false
@@ -196,10 +202,13 @@ local function ReadSetupGEN()
 	SetSwichDUNout = Setting("Swich back from Dungeon")
 	SetSwichDUNdelay = Setting("Dungeon Swich Delay")
 	
+	SetMassLoot = Setting("Mass Loot")
+	SetFastLoot = Setting("Fast Loot")
+	SetAutoTalent = Setting("Zygor Auto Talent Advisor")
 end
 
 
--- Settings General
+-- Settings Buffs
 -- OK (Locals)
 local function ReadSetupBUF()
 
@@ -350,6 +359,47 @@ local function Locals()
 	
 end
 
+-- Mass Loot Objects
+GetLootObjects = function()
+	local Lootobjects = {}
+	    for i=1,GetObjectCount() do
+			tinsert(Lootobjects,GetObjectWithIndex(i))
+	    end
+	    --print(tostring(Lootobjects))
+	    return Lootobjects
+end
+
+-- Mass Looting in Range 5 yards
+local function MassLoot()
+	if SetMassLoot then
+		local total_Lootobjects = GetLootObjects(500)
+		for i = 1, #total_Lootobjects do     
+			if UnitCanBeLooted(total_Lootobjects[i]) and GetDistanceBetweenObjects("player",total_Lootobjects[i]) <= 5 then
+				ObjectInteract(total_Lootobjects[i])
+			end
+		end
+		CloseLoot({errNo})
+	end
+end 
+
+-- Fast Looting
+local function FastLoot()
+	 if SetFastLoot then
+		if GetTime() - LootDL >= DEBOUNCE_INTERVAL then
+			LootDL = GetTime()
+			if GetCVarBool("autoLootDefault") ~= IsModifiedClick("AUTOLOOTTOGGLE") then
+				for i = GetNumLootItems(), 1, -1 do
+					LootSlot(i)
+				end
+				LootDL = GetTime()
+			end
+		end
+	end
+end
+
+local function WaitWhileDoNothing()
+	-- Do Nothing here - Use it as Breake
+end
 
 -- Defens Pioriti 1
 -- OK (Warlock.Rotation)
@@ -436,15 +486,15 @@ local function WarlockBuff()
 			if  Buff.DetectLesserInvisibility:Remain() < 30 and Spell.DetectLesserInvisibility:Cast(Player) then oocdebug("Buff: Detect Lesser Invisibility") return true end
 		end
 	end
-	
-	
 end
 
 
 -- Do Create Healthstone
 -- OK (OCC)
 local function CreateHealthstone()
+		-- Cast Timer +1
 		PlusTime = 4
+		
 		if Spell.CreateHealthstoneMajor:Known() then
 			if not Spell.CreateHealthstoneMajor:LastCast() and not Item.MajorHealthstone:InBag() and Spell.CreateHealthstoneMajor:Cast(Player) then 
 				if DMWAPI == "bntapi" then BANETO_DELAY_MESHPATHING = GetTime()+PlusTime end
@@ -491,14 +541,15 @@ local function CreateHealthstone()
 				return true 
 			end
 		end
-		
 end
 
 
 -- Do Create Soulstone
 -- OK (OCC)
 local function CreateSoulstone()
+	-- Cast Timer +1
 	PlusTime = 4
+	
     if Spell.CreateSoulstoneMajor:Known() then
         if not Spell.CreateSoulstoneMajor:LastCast() and not Item.MajorSoulstone:InBag() and Spell.CreateSoulstoneMajor:Cast(Player) then 
 			if DMWAPI == "bntapi" then BANETO_DELAY_MESHPATHING = GetTime()+PlusTime end
@@ -545,14 +596,12 @@ local function CreateSoulstone()
 			return true 
 		end
     end
-
 end
 
 
 -- Count Shards an Delete > Max
 -- OK (OCC)
 local function Shards(Max)
-
     Max = Max or 99
     local Count = 0
     for Bag = 0, 4, 1 do
@@ -570,7 +619,6 @@ local function Shards(Max)
         end
     end
     return Count
-
 end
 
 
@@ -579,8 +627,28 @@ end
 local function OOC()
 
     if not Player.Casting and not Player.Combat then 
-	
-			
+		
+		
+		if SetMassLoot then MassLoot() end
+		
+		if DMWAPI == "bntapi" then
+			if BANETO_State == "MOUNT" then 
+				PlusTime = 4
+				StopMoving()
+				BANETO_Mount()
+				DMWCwait(PlusTime, WaitWhileDoNothing)
+				oocdebug("Baneto Mount") 
+				return true 
+			end
+		end
+				
+		--PrintTextTest = BANETO_State
+		--if PTTOld ~= PrintTextTest then		
+		--	print(tostring(PrintTextTest))
+		--	PTTOld = PrintTextTest
+		--end
+		
+		--Reset LifDrai/HFunnel Counter to 0
 		DefenseDrainLife = 0
 		DefenseHFunnel = 0
 	
@@ -668,17 +736,16 @@ local function OOC()
         end
 		
 		-- Dark Pact OOC
-		if Pet and not Pet.Dead and SetManDPCOOCyn and not Player.Moving and Player.PowerPct <= SetManDOCPLmp and Pet:PowerPct() > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then oocdebug("Dark Pact OOC") mmdebug("Dark Pact OOC") return true end
+		if Pet and not Pet.Dead and SetManDPCOOCyn and not Player.Moving and Player.PowerPct <= SetManDOCPLmp and PetManaPct > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then oocdebug("Dark Pact OOC") mmdebug("Dark Pact OOC") return true end
 		
 		-- Life Tap OOC
         if SetManLITOOCyn and not Player.Moving and Player.HP >= SetManLIThp and Player.PowerPct <= SetManLITmp and Spell.LifeTap:Cast(Player) then oocdebug("Life Tap OOC") mmdebug("Life Tap OOC") return true end
 	  
         -- Auto Target Quest Units
 		if SetGenAutoTQU then
-            if Player:AutoTargetQuest(30, true) then oocdebug("Auto Target Quest Unit") return true end
+            if Player:AutoTargetQuest(36, true) then oocdebug("Auto Target Quest Unit") return true end
         end
-     end
-
+    end
 end
 
 
@@ -688,7 +755,7 @@ local function Manamanagment ()
 
 	if not Player.Casting and Player.Combat then 
 		-- Dark Pact
-		if Pet and not Pet.Dead and SetManDPCyn and Player.PowerPct <= SetManDOCPLmp and Pet:PowerPct() > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then mmdebug("Dark Pact IC") return true end
+		if Pet and not Pet.Dead and SetManDPCyn and Player.PowerPct <= SetManDOCPLmp and PetManaPct > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then mmdebug("Dark Pact IC") return true end
 	
 		-- Life Tap
 		if SetManLITSAFEyn then
@@ -706,7 +773,6 @@ local function Manamanagment ()
             if Item.ManaPotion:Use() then mmdebug("Use Mana Potion") return true end
         end
 	end
-
 end
 
 
@@ -741,7 +807,6 @@ local function Cycle()
             if (not Spell.Immolate:LastCast() or (DMW.Player.LastCast[1].SuccessTime and (DMW.Time - DMW.Player.LastCast[1].SuccessTime) > 0.7) or not UnitIsUnit(Spell.Immolate.LastBotTarget, Unit.Pointer)) and Unit.CreatureType ~= "Totem" and Unit.Facing and not Debuff.Immolate:Exist(Unit) and Unit.TTD > 10 and Spell.Immolate:Cast(Unit) then dpsdebug("Cycle Immolate: "..Debuff.Immolate:Count()) return true end
         end
     end
-
 end
 
 
@@ -790,7 +855,6 @@ local function Wand()
         WandTime = DMW.Time
         return true
     end
-
 end
 
 
@@ -827,7 +891,7 @@ local function Damage ()
 	-- Auto Target in Combat
 	Target = Player.Target or false
 	if Player.Combat and SetGenAutoTarget and HUD.PVE_PVP == 1 then
-		if Player:AutoTarget(30, true) then dpsdebug("Auto Target IC") return true end
+		if Player:AutoTarget(36, true) then dpsdebug("Auto Target IC") return true end
     end
 
 	if not Player.Casting then
@@ -840,7 +904,7 @@ local function Damage ()
 	
 	-- Drain Soul 
 	Target = Player.Target or false
-	if not Player.Moving and not Target.Player and SetDpsDSSyn and (not SetDpsDSSsp or ShardCount < SetDpsDSSms) and (not Player.Casting or (Player.Casting ~= Spell.DrainSoul.SpellName and Player.Casting ~= Spell.Hellfire.SpellName and Player.Casting ~= Spell.RainOfFire.SpellName)) and Spell.DrainSoul:CD() < 0.2 and Debuff.Shadowburn:Count() == 0 then
+		if not Player.Moving and not Target.Player and SetDpsDSSyn and (not SetDpsDSSsp or ShardCount < SetDpsDSSms) and (not Player.Casting or (Player.Casting ~= Spell.DrainSoul.SpellName and Player.Casting ~= Spell.Hellfire.SpellName and Player.Casting ~= Spell.RainOfFire.SpellName)) and Spell.DrainSoul:CD() < 0.2 and Debuff.Shadowburn:Count() == 0 then
         for _, Unit in ipairs(Enemies30Y) do
             if Unit.Facing and Unit.Level > DMW.Enums.GrayLvl[Player.Level] and not Unit.Player and (Unit.TTD < 3 or Unit.HP < 8) and not Unit:IsBoss() and not UnitIsTapDenied(Unit.Pointer) then
                 if Spell.DrainSoul:Cast(Unit) then dpsdebug("Drain Soul") WandTime = DMW.Time return true end
@@ -928,7 +992,6 @@ local function Damage ()
 		Target = Player.Target or false
 		if SetGenWand and DMW.Player.Equipment[18] and Target.Facing and Wand() then return true end
     end
-	
 end
 
 
@@ -1068,15 +1131,30 @@ function AutoSwichDelay()
 	end
 end
 
+-- Zygor Talent Auto Learning
+local function ZygorTalentSkill()
+	if not Player.Combat and SetAutoTalent then
+		Random = math.random(15, 30)
+		DMWCwait(Random, ZGV.ZTA:LearnSuggestedTalents())
+		PlayerLevel = UnitLevel("player")
+		TalentFrame:Hide()
+	end
+end
+
+-- event frame LootWindow - Fast Looting
+local faster = CreateFrame("Frame")
+faster:RegisterEvent("LOOT_READY")
+faster:SetScript("OnEvent", FastLoot)
+
 -- WARLOCK Rotation
 function Warlock.Rotation()	
 	ReadSetupStartDelay()
-	--print(tostring(startDelayYN))
 	if startDelayYN == 0 then DMWCwait(SetStartDelay, startDelay) end -- give Bot time to load on login
 	logbug ()
 	if startDelayYN == 1 then
 		Locals()
 		AutoSwich()	
+		if PlayerLevel < UnitLevel("player") then ZygorTalentSkill() end
 		DefensPrio1()
 		OOC()
 		Manamanagment()
