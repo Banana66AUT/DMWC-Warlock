@@ -47,7 +47,7 @@ function Warlock.Settings()
 	UI.AddHeader("schadis/DMWC - Buff Sniper integrated")
 	UI.AddHeader("https://github.com/schadis")
 	
-	-- Test Menue
+	-- Special Menue
 	UI.AddTab("Specials")
 	UI.AddHeader("Looting")
 	UI.AddBlank(true)
@@ -60,6 +60,10 @@ function Warlock.Settings()
 	UI.AddToggle("Zygor Auto Talent Advisor","Automatic lerning Talent on Zygor Talent Advisor", false, false)
 	UI.AddBlank(true)
 	UI.AddBlank(true)
+	UI.AddHeader("Mounting on Baneto")
+	UI.AddToggle("Force Mounting","Do Mounting on CR if Baneto do not", true, true)
+	UI.AddRange("Destination Distance to Mount", "Distance to the Destination to mount up", 20, 200, 1, 50, true)
+	UI.AddRange("Time OOC to block Mount", "Time out of combat before mont up", 0, 240, 1, 15, true)
 	
 	--
 	--Auto Swich

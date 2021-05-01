@@ -30,9 +30,10 @@ local LootDL = 0
 local DEBOUNCE_INTERVAL = 0.3
 local PrintTextTest = " "
 local PTTOld = " "
+local MountTime = GetTime()
 
 local SetGenAutoBuff, SetGenBUFdbPVE, SetGenBUFdbPVP, SetGenBUFdbDUN, SetGenBUFubPVE, SetGenBUFubPVP, SetGenBUFubDUN, SetGenBUFdiPVE, SetGenBUFdiPVP, SetGenBUFdiDUN, SetGenWand, SetGenAAMelee, SetGenAutoTarget, SetGenAutoTQU, PVEP, SetBSnTarPVP, SetBSnZG, SetBSnWCB, SetBSnONYNEF	
-local SetPetPET, SetPetAutoAttack, SetPetHFUyn, SetPetHFUhp, SetPetSACyn, SetPetSACplhp, SetPetSACpehp 
+local SetPetPET, SetPetAutoAttack, SetPetHFUyn, SetPetHFUhp, SetPetSACyn, SetPetSACplhp, SetPetSACpehp, SetMountYN, SetMountDis, SetMountTime
 local SetDefCHSTyn, SetDefUHSTyn, SetDefUHSThp, SetDefUHPOyn, SetDefUHPOhp, SetDefCSSTyn, SetDefUSSTpl, SetDefUDLIyn, SetDefUDLIhp, SetDefULUFyn, SetDefUINSyn, SetDefUSWAyn, SetDefUFBEyn, SetDefUFSMyn
 local SetManLITyn, SetManLITOOCyn, SetManLITmp, SetManLIThp, SetManLITSAFEyn, SetManELITyn, SetManELITmp, SetManELIThp, SetManDPCyn, SetManDPCOOCyn, SetManDOCPLmp, SetManDOCPEmp, SetManUMPOyn, SetManUMPOmp
 local SetDpsSHB, SetDpsSHBmp, SetDpsSPAyn, SetDpsSFyn, SetDpsMDOli, SetDpsCurse, SetDpsCurseCYyn, SetDpsAMPyn, SetDpsCORyn, SetDpsCORCYyn, SetDpsCORCYr1, SetDpsIMMyn, SetDpsIMMCYyn, SetDpsSLIyn, SetDpsSLICYyn, SetDpsSBUyn 
@@ -205,6 +206,10 @@ local function ReadSetupGEN()
 	SetMassLoot = Setting("Mass Loot")
 	SetFastLoot = Setting("Fast Loot")
 	SetAutoTalent = Setting("Zygor Auto Talent Advisor")
+	
+	SetMountYN = Setting("Force Mounting")
+	SetMountDis = Setting("Destination Distance to Mount")
+	SetMountTime = Setting("Time OOC to block Mount")
 end
 
 
@@ -622,31 +627,66 @@ local function Shards(Max)
 end
 
 
--- Out of Combat
--- OK (Warlock.Rotation)
-local function OOC()
-
-    if not Player.Casting and not Player.Combat then 
-		
-		
-		if SetMassLoot then MassLoot() end
-		
-		if DMWAPI == "bntapi" then
-			if BANETO_State == "MOUNT" then 
-				PlusTime = 4
-				StopMoving()
-				BANETO_Mount()
-				DMWCwait(PlusTime, WaitWhileDoNothing)
-				oocdebug("Baneto Mount") 
-				return true 
+local function BanetoForceMount()
+	PlusTime = 4
+	local NeedMountDistance = 0
+	local HasMountX = BANETO_HasMount() or false
+	local IsIndoorX = IsIndoors() or false
+	local DestinationX = BANETO_GetEwtDestination() 
+	local DesX,DesY,DesZ
+	local PlaX = Player.PosX
+	local PlaY = Player.PosY
+	local PlaZ = Player.PosZ
+	if DestinationX ~= nil then DesX = DestinationX[1] DesY = DestinationX[2] DesZ = DestinationX[3] end
+	if DestinationX ~= nil then NeedMountDistance = BANETO_GetDistance3D(DesX,DesY,DesZ,PlaX,PlaY,PlaZ) else NeedMountDistance = 0 end
+	if BANETO_State == "IDLE" then NeedMountDistance = 0 end
+	
+	if SetMountYN and NeedMountDistance > SetMountDis and GetTime() - Player.CombatLeftTime > SetMountTime and HasMountX and not IsIndoorX and not Player.Combat then 
+		if MountTime < GetTime() - PlusTime then
+			if DMWAPI == "bntapi" then
+				if BANETO_State == "MOUNT" then
+					BANETO_DELAY_MESHPATHING = GetTime() + PlusTime
+					DMWCwait(PlusTime, WaitWhileDoNothing)
+					oocdebug("Baneto Mount")
+					MountTime = GetTime()
+					--print(tostring("Test - Self Mount"))
+				else
+					if not BANETO_State == "LOOTING" and not BANETO_State == "REGEN" then
+						StopMoving()
+						BANETO_DELAY_MESHPATHING = GetTime() + PlusTime
+						if BANETO_GetUnitSpeed("player") == 0 then BANETO_Mount() end
+						oocdebug("Force Mount")
+						MountTime = GetTime()
+						--print(tostring("Test - Help Mount"))
+					end
+				end
 			end
 		end
-				
-		--PrintTextTest = BANETO_State
+	end
+
+		--PrintTextTest = BANETO_State 
 		--if PTTOld ~= PrintTextTest then		
 		--	print(tostring(PrintTextTest))
 		--	PTTOld = PrintTextTest
 		--end
+end
+
+
+
+-- Out of Combat
+-- OK (Warlock.Rotation)
+local function OOC()
+
+    if not Player.Casting and not Player.Combat and not Player.Dead then 
+		
+		
+		if SetMassLoot then MassLoot() end
+		
+		
+		if DMWAPI == "bntapi" then
+			BanetoForceMount()
+		end
+		
 		
 		--Reset LifDrai/HFunnel Counter to 0
 		DefenseDrainLife = 0
@@ -753,7 +793,7 @@ end
 -- OK (Warlock.Rotation)
 local function Manamanagment ()
 
-	if not Player.Casting and Player.Combat then 
+	if not Player.Casting and Player.Combat and not Player.Dead then 
 		-- Dark Pact
 		if Pet and not Pet.Dead and SetManDPCyn and Player.PowerPct <= SetManDOCPLmp and PetManaPct > SetManDOCPEmp and Spell.DarkPact:Cast(Player) then mmdebug("Dark Pact IC") return true end
 	
@@ -861,144 +901,146 @@ end
 -- Damage
 -- OK (Warlock.Rotation)
 local function Damage ()
-
-	-- Swich to new Target if Target in Fear
-	Target = Player.Target or false
-    if Player.Casting and Player.Casting == Spell.Fear.SpellName and NewTarget then
-        TargetUnit(NewTarget.Pointer)
-        DMW.Player.Target = NewTarget
-        NewTarget = false
-		dpsdebug("New Target after Fear")
-    end
-	
-	-- PVP active Targeting
-	Target = Player.Target or false
-	if HUD.PVE_PVP == 2 and SetBSnTarPVP then
-		if Target.Distance > 30 then
-			if DMWAPI == "bntapi" or DMWAPI == "wmbapi" then StopMoving() end
-			for i, Unit in ipairs(Enemies20Y) do
-                if i > 1 and Unit.TTD > 3 then PVPTarget = Unit return true end
-            end
-		end		
-		if PVPTarget then
-			TargetUnit(PVPTarget.Pointer)
-			DMW.Player.Target = PVPTarget
-			PVPTarget = false
-			dpsdebug("New PVP Target")
+		if not Player.Dead then
+		-- Swich to new Target if Target in Fear
+		Target = Player.Target or false
+		if Player.Casting and Player.Casting == Spell.Fear.SpellName and NewTarget then
+			TargetUnit(NewTarget.Pointer)
+			DMW.Player.Target = NewTarget
+			NewTarget = false
+			dpsdebug("New Target after Fear")
 		end
-	end 
-	
-	-- Auto Target in Combat
-	Target = Player.Target or false
-	if Player.Combat and SetGenAutoTarget and HUD.PVE_PVP == 1 then
-		if Player:AutoTarget(36, true) then dpsdebug("Auto Target IC") return true end
-    end
+		
+		-- PVP active Targeting
+		Target = Player.Target or false
+		if HUD.PVE_PVP == 2 and SetBSnTarPVP then
+			if Target.Distance > 30 then
+				if DMWAPI == "bntapi" or DMWAPI == "wmbapi" then StopMoving() end
+				for i, Unit in ipairs(Enemies20Y) do
+					if i > 1 and Unit.TTD > 3 then PVPTarget = Unit return true end
+				end
+			end		
+			if PVPTarget then
+				TargetUnit(PVPTarget.Pointer)
+				DMW.Player.Target = PVPTarget
+				PVPTarget = false
+				dpsdebug("New PVP Target")
+			end
+		end 
 
-	if not Player.Casting then
-		-- Force Schadow Bolt on Shadow Trance
-        if SetDpsSHB ~= 1 and Buff.ShadowTrance:Exist(Player) and Buff.ShadowTrance:Remain(Player) < 2 and Player.PowerPct >= SetDpsSHBmp and Spell.ShadowBolt:Cast(Target) then dpsdebug("Force Schadow Bolt on Shadow Trance") return true end
-        
-        --Force refresh Corruption on fear
-        if SetDpsCORyn and Debuff.Fear:Exist(Target) and (Spell.Fear:LastCast() or Spell.Fear:LastCast(2)) and Debuff.Corruption:Remain(Target) < Target.TTD and (not Player.Moving or Talent.ImprovedCorruption.Rank == 5) and Spell.Corruption:Cast(Target) then dpsdebug("Force Corruption on Fear") return true end
-    end
-	
-	-- Drain Soul 
-	Target = Player.Target or false
-		if not Player.Moving and not Target.Player and SetDpsDSSyn and (not SetDpsDSSsp or ShardCount < SetDpsDSSms) and (not Player.Casting or (Player.Casting ~= Spell.DrainSoul.SpellName and Player.Casting ~= Spell.Hellfire.SpellName and Player.Casting ~= Spell.RainOfFire.SpellName)) and Spell.DrainSoul:CD() < 0.2 and Debuff.Shadowburn:Count() == 0 then
-        for _, Unit in ipairs(Enemies30Y) do
-            if Unit.Facing and Unit.Level > DMW.Enums.GrayLvl[Player.Level] and not Unit.Player and (Unit.TTD < 3 or Unit.HP < 8) and not Unit:IsBoss() and not UnitIsTapDenied(Unit.Pointer) then
-                if Spell.DrainSoul:Cast(Unit) then dpsdebug("Drain Soul") WandTime = DMW.Time return true end
-            end
-        end
-    end
-	
-	-- Shadowburn
-	Target = Player.Target or false
-    if SetDpsSBUyn and ShardCount >= SetDpsDSSms and (not Player.Casting or (Player.Casting ~= Spell.DrainSoul.SpellName and Player.Casting ~= Spell.Hellfire.SpellName and Player.Casting ~= Spell.RainOfFire.SpellName)) and Spell.Shadowburn:IsReady() then
-        for _, Unit in ipairs(Enemies30Y) do
-            if Unit.Facing and (Unit.TTD < SetDpsSBUttd or Unit.HP < SetDpsSBUhp ) and not Unit:IsBoss() and not UnitIsTapDenied(Unit.Pointer) then
-                if Player.Casting then SpellStopCasting() end
-                if Spell.Shadowburn:Cast(Unit) then dpsdebug("Shadowburn") return true end
-            end
-        end
-    end
-	
-    if not Player.Casting then
-		-- Fear Bonus Enemy
-		Target = Player.Target or false
-        if not Player.Moving and SetDefUFBEyn and Spell.Fear:IsReady() and Debuff.Fear:Count() == 0 and (not Spell.Fear:LastCast() or (DMW.Player.LastCast[1].SuccessTime and (DMW.Time - DMW.Player.LastCast[1].SuccessTime) > 0.7)) then
-            local CreatureType = Target.CreatureType
-            if Enemies20YC > 1 and not Player.InGroup and not (CreatureType == "Undead" or CreatureType == "Mechanical" or CreatureType == "Totem") and Target.TTD > 3 and not Target:IsBoss() and
-            (not SetDpsIMMyn or not Spell.Immolate:Known() or Debuff.Immolate:Exist(Target) or Target.TTD < 10) and 
-            (not SetDpsCORyn or not Spell.Corruption:Known() or Debuff.Corruption:Exist(Target) or Target.TTD < 7) and
-            (not SetDpsSLIyn or not Spell.SiphonLife:Known() or Debuff.SiphonLife:Exist(Target) or Target.TTD < 10) and 
-            (not Curse or not Spell[Curse]:Known() or Debuff[Curse]:Exist(Target) or Target.TTD < 10 ) then                    
-                for i, Unit in ipairs(Enemies20Y) do
-                    if i > 1 and Unit.TTD > 3 and Spell.Fear:Cast(Target) then dpsdebug("Fear Bonus Enemy") NewTarget = Unit return true end
-                end
-            end
-        end
 		
-		-- Pet Attack
+		-- Auto Target in Combat
 		Target = Player.Target or false
-        if SetPetAutoAttack and Pet and not Pet.Dead and not UnitIsUnit(Target.Pointer, "pettarget") and DMW.Time > (PetAttackTime + 1) then
-            PetAttackTime = DMW.Time
-            PetAttack()
-			dpsdebug("Pet Attack")
-        end
-		
-		-- Start Autoattack if no Wand or Setting:Auto Attack In Melee
-		Target = Player.Target or false
-        if not SetGenWand and (not DMW.Player.Equipment[18] or (Target.Distance <= 1 and SetGenAAMelee)) and not IsCurrentSpell(Spell.Attack.SpellID) then
-            StartAttack()
-			dpsdebug("Auto Attack if no Wand or no Setup")
-        end
-		
-		
-		
-		-- Start Single-Damage Rotation
-		Target = Player.Target or false
-        if Single() then return true end
-		
-		-- Start Soul Fire on CD
-		Target = Player.Target or false
-        if SetDpsSFyn and Spell.SoulFire:Known() and not Player:IsTanking() and Target.TTD > 20 and not Player.Moving and  Spell.SoulFire:Cast(Target) then dpsdebug("Soul Fire") return true end
-					
-		-- Start Cycle-Damage Rotation
-		Target = Player.Target or false
-        if Cycle() then return true end
-		
-        -- Fear on Solo Farming
-		Target = Player.Target or false
-		if SetDefUFSMyn and not Player.Moving and Target.TTD > 3 and #DMW.Friends.Units < 2 and not (Target.CreatureType == "Undead" or Target.CreatureType == "Mechanical" or Target.CreatureType == "Totem") and (SetDpsSHB ~= 2 or Player.PowerPct < SetDpsSHBmp or Spell.ShadowBolt:LastCast() or (Spell.ShadowBolt:LastCast(2) and (Spell.LifeTap:LastCast() or Spell.DarkPact:LastCast()))) and Debuff.Fear:Count() == 0 and (not Spell.Fear:LastCast() or (DMW.Player.LastCast[1].SuccessTime and (DMW.Time - DMW.Player.LastCast[1].SuccessTime) > 0.7)) and Spell.Fear:Cast(Target) then dpsdebug("Fear Solo Farming") return true end
-        
-		-- Use Shadow Bolt on Always
-		Target = Player.Target or false
-		if SetDpsSHB == 2 and Target.Facing and (not Player.Moving or Buff.ShadowTrance:Exist(Player)) and Player.PowerPct > SetDpsSHBmp and (Target.TTD > Spell.ShadowBolt:CastTime() or (Target.Distance > 5 and not DMW.Player.Equipment[18])) and Spell.ShadowBolt:Cast(Target) then dpsdebug("Schadow Bolt Always") return true end
-        
-		-- Use Shadow Bolt on Shadow Trance
-		Target = Player.Target or false
-		if SetDpsSHB == 3 and Target.Facing and Player.PowerPct > SetDpsSHBmp and Buff.ShadowTrance:Exist(Player) and Spell.ShadowBolt:Cast(Target) then dpsdebug("Shadow Bolt on Shadow Trance") return true end
-        
-		-- Searing Pain on CD or Always
-		Target = Player.Target or false
-		if SetDpsSPAyn and Target.Facing and not Player.Moving and (SetDpsSHB ~= 2 or Spell.ShadowBolt:CD() > 2 or Target.TTD < Spell.ShadowBolt:CastTime()) and Spell.SearingPain:Cast(Target) then dpsdebug("Searing Pain") return true end
-		
-		-- Drain Life as Filler
-		Target = Player.Target or false
-        if SetDpsDLIFIyn and not Player.Moving and Player.HP <= SetDpsDLIFIhp and Target.CreatureType ~= "Mechanical" and (Target.Player or Target.TTD > 3) and Spell.DrainLife:Cast(Target) then dpsdebug("Drain Life as Filler") return true end
+		if Player.Combat and SetGenAutoTarget and HUD.PVE_PVP == 1 then
+			if Player:AutoTarget(36, true) then dpsdebug("Auto Target IC") return true end
+		end
 
-		-- Use Wand
+		if not Player.Casting then
+			-- Force Schadow Bolt on Shadow Trance
+			if SetDpsSHB ~= 1 and Buff.ShadowTrance:Exist(Player) and Buff.ShadowTrance:Remain(Player) < 2 and Player.PowerPct >= SetDpsSHBmp and Spell.ShadowBolt:Cast(Target) then dpsdebug("Force Schadow Bolt on Shadow Trance") return true end
+			
+			--Force refresh Corruption on fear
+			if SetDpsCORyn and Debuff.Fear:Exist(Target) and (Spell.Fear:LastCast() or Spell.Fear:LastCast(2)) and Debuff.Corruption:Remain(Target) < Target.TTD and (not Player.Moving or Talent.ImprovedCorruption.Rank == 5) and Spell.Corruption:Cast(Target) then dpsdebug("Force Corruption on Fear") return true end
+		end
+		
+		-- Drain Soul 
 		Target = Player.Target or false
-		if SetGenWand and DMW.Player.Equipment[18] and Target.Facing and Wand() then return true end
-    end
+			if not Player.Moving and not Target.Player and SetDpsDSSyn and (not SetDpsDSSsp or ShardCount < SetDpsDSSms) and (not Player.Casting or (Player.Casting ~= Spell.DrainSoul.SpellName and Player.Casting ~= Spell.Hellfire.SpellName and Player.Casting ~= Spell.RainOfFire.SpellName)) and Spell.DrainSoul:CD() < 0.2 and Debuff.Shadowburn:Count() == 0 then
+			for _, Unit in ipairs(Enemies30Y) do
+				if Unit.Facing and Unit.Level > DMW.Enums.GrayLvl[Player.Level] and not Unit.Player and (Unit.TTD < 3 or Unit.HP < 8) and not Unit:IsBoss() and not UnitIsTapDenied(Unit.Pointer) then
+					if Spell.DrainSoul:Cast(Unit) then dpsdebug("Drain Soul") WandTime = DMW.Time return true end
+				end
+			end
+		end
+		
+		-- Shadowburn
+		Target = Player.Target or false
+		if SetDpsSBUyn and ShardCount >= SetDpsDSSms and (not Player.Casting or (Player.Casting ~= Spell.DrainSoul.SpellName and Player.Casting ~= Spell.Hellfire.SpellName and Player.Casting ~= Spell.RainOfFire.SpellName)) and Spell.Shadowburn:IsReady() then
+			for _, Unit in ipairs(Enemies30Y) do
+				if Unit.Facing and (Unit.TTD < SetDpsSBUttd or Unit.HP < SetDpsSBUhp ) and not Unit:IsBoss() and not UnitIsTapDenied(Unit.Pointer) then
+					if Player.Casting then SpellStopCasting() end
+					if Spell.Shadowburn:Cast(Unit) then dpsdebug("Shadowburn") return true end
+				end
+			end
+		end
+		
+		if not Player.Casting then
+			-- Fear Bonus Enemy
+			Target = Player.Target or false
+			if not Player.Moving and SetDefUFBEyn and Spell.Fear:IsReady() and Debuff.Fear:Count() == 0 and (not Spell.Fear:LastCast() or (DMW.Player.LastCast[1].SuccessTime and (DMW.Time - DMW.Player.LastCast[1].SuccessTime) > 0.7)) then
+				local CreatureType = Target.CreatureType
+				if Enemies20YC > 1 and not Player.InGroup and not (CreatureType == "Undead" or CreatureType == "Mechanical" or CreatureType == "Totem") and Target.TTD > 3 and not Target:IsBoss() and
+				(not SetDpsIMMyn or not Spell.Immolate:Known() or Debuff.Immolate:Exist(Target) or Target.TTD < 10) and 
+				(not SetDpsCORyn or not Spell.Corruption:Known() or Debuff.Corruption:Exist(Target) or Target.TTD < 7) and
+				(not SetDpsSLIyn or not Spell.SiphonLife:Known() or Debuff.SiphonLife:Exist(Target) or Target.TTD < 10) and 
+				(not Curse or not Spell[Curse]:Known() or Debuff[Curse]:Exist(Target) or Target.TTD < 10 ) then                    
+					for i, Unit in ipairs(Enemies20Y) do
+						if i > 1 and Unit.TTD > 3 and Spell.Fear:Cast(Target) then dpsdebug("Fear Bonus Enemy") NewTarget = Unit return true end
+					end
+				end
+			end
+			
+			-- Pet Attack
+			Target = Player.Target or false
+			if SetPetAutoAttack and Pet and not Pet.Dead and not UnitIsUnit(Target.Pointer, "pettarget") and DMW.Time > (PetAttackTime + 1) then
+				PetAttackTime = DMW.Time
+				PetAttack()
+				dpsdebug("Pet Attack")
+			end
+			
+			-- Start Autoattack if no Wand or Setting:Auto Attack In Melee
+			Target = Player.Target or false
+			if not SetGenWand and (not DMW.Player.Equipment[18] or (Target.Distance <= 1 and SetGenAAMelee)) and not IsCurrentSpell(Spell.Attack.SpellID) then
+				StartAttack()
+				dpsdebug("Auto Attack if no Wand or no Setup")
+			end
+			
+			
+			
+			-- Start Single-Damage Rotation
+			Target = Player.Target or false
+			if Single() then return true end
+			
+			-- Start Soul Fire on CD
+			Target = Player.Target or false
+			if SetDpsSFyn and Spell.SoulFire:Known() and not Player:IsTanking() and Target.TTD > 20 and not Player.Moving and  Spell.SoulFire:Cast(Target) then dpsdebug("Soul Fire") return true end
+						
+			-- Start Cycle-Damage Rotation
+			Target = Player.Target or false
+			if Cycle() then return true end
+			
+			-- Fear on Solo Farming
+			Target = Player.Target or false
+			if SetDefUFSMyn and not Player.Moving and Target.TTD > 3 and #DMW.Friends.Units < 2 and not (Target.CreatureType == "Undead" or Target.CreatureType == "Mechanical" or Target.CreatureType == "Totem") and (SetDpsSHB ~= 2 or Player.PowerPct < SetDpsSHBmp or Spell.ShadowBolt:LastCast() or (Spell.ShadowBolt:LastCast(2) and (Spell.LifeTap:LastCast() or Spell.DarkPact:LastCast()))) and Debuff.Fear:Count() == 0 and (not Spell.Fear:LastCast() or (DMW.Player.LastCast[1].SuccessTime and (DMW.Time - DMW.Player.LastCast[1].SuccessTime) > 0.7)) and Spell.Fear:Cast(Target) then dpsdebug("Fear Solo Farming") return true end
+			
+			-- Use Shadow Bolt on Always
+			Target = Player.Target or false
+			if SetDpsSHB == 2 and Target.Facing and (not Player.Moving or Buff.ShadowTrance:Exist(Player)) and Player.PowerPct > SetDpsSHBmp and (Target.TTD > Spell.ShadowBolt:CastTime() or (Target.Distance > 5 and not DMW.Player.Equipment[18])) and Spell.ShadowBolt:Cast(Target) then dpsdebug("Schadow Bolt Always") return true end
+			
+			-- Use Shadow Bolt on Shadow Trance
+			Target = Player.Target or false
+			if SetDpsSHB == 3 and Target.Facing and Player.PowerPct > SetDpsSHBmp and Buff.ShadowTrance:Exist(Player) and Spell.ShadowBolt:Cast(Target) then dpsdebug("Shadow Bolt on Shadow Trance") return true end
+			
+			-- Searing Pain on CD or Always
+			Target = Player.Target or false
+			if SetDpsSPAyn and Target.Facing and not Player.Moving and (SetDpsSHB ~= 2 or Spell.ShadowBolt:CD() > 2 or Target.TTD < Spell.ShadowBolt:CastTime()) and Spell.SearingPain:Cast(Target) then dpsdebug("Searing Pain") return true end
+			
+			-- Drain Life as Filler
+			Target = Player.Target or false
+			if SetDpsDLIFIyn and not Player.Moving and Player.HP <= SetDpsDLIFIhp and Target.CreatureType ~= "Mechanical" and (Target.Player or Target.TTD > 3) and Spell.DrainLife:Cast(Target) then dpsdebug("Drain Life as Filler") return true end
+
+			-- Use Wand
+			Target = Player.Target or false
+			if SetGenWand and DMW.Player.Equipment[18] and Target.Facing and Wand() then return true end
+		end
+	end
 end
 
 
 -- Defense Prio2
 -- OK (Warlock.Rotation)
 local function DefensePrio2 ()
-	if Player.Combat then
+	if Player.Combat and not Player.Dead then
 	  
 		-- Cast Shodow Ward on Target by Priest or Warlock 
 		if Player.Target and (Target.Class == "PRIEST" or Target.Class == "WARLOCK") and SetDefUSWAyn and Spell.ShadowWard:Cast(Player) then defdebug("Shodow Ward") return true end
@@ -1131,6 +1173,7 @@ function AutoSwichDelay()
 	end
 end
 
+
 -- Zygor Talent Auto Learning
 local function ZygorTalentSkill()
 	if not Player.Combat and SetAutoTalent then
@@ -1158,7 +1201,7 @@ function Warlock.Rotation()
 		DefensPrio1()
 		OOC()
 		Manamanagment()
-		if Target and Target.ValidEnemy and Target.Distance < 36 then Damage() end
+		if Target and Target.ValidEnemy and Target.Distance < 30 then Damage() end
 		DefensePrio2()
 		Buffsniper()
 	end 
