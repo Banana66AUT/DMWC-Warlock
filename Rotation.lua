@@ -33,7 +33,7 @@ local PTTOld = " "
 local MountTime = GetTime()
 
 local SetGenAutoBuff, SetGenBUFdbPVE, SetGenBUFdbPVP, SetGenBUFdbDUN, SetGenBUFubPVE, SetGenBUFubPVP, SetGenBUFubDUN, SetGenBUFdiPVE, SetGenBUFdiPVP, SetGenBUFdiDUN, SetGenWand, SetGenAAMelee, SetGenAutoTarget, SetGenAutoTQU, PVEP, SetBSnTarPVP, SetBSnZG, SetBSnWCB, SetBSnONYNEF	
-local SetPetPET, SetPetAutoAttack, SetPetHFUyn, SetPetHFUhp, SetPetSACyn, SetPetSACplhp, SetPetSACpehp, SetMountYN, SetMountDis, SetMountTime
+local SetPetPET, SetPetAutoAttack, SetPetHFUyn, SetPetHFUhp, SetPetSACyn, SetPetSACplhp, SetPetSACpehp, SetMountYN, SetMountDis, SetMountTime, SetAutoTalent
 local SetDefCHSTyn, SetDefUHSTyn, SetDefUHSThp, SetDefUHPOyn, SetDefUHPOhp, SetDefCSSTyn, SetDefUSSTpl, SetDefUDLIyn, SetDefUDLIhp, SetDefULUFyn, SetDefUINSyn, SetDefUSWAyn, SetDefUFBEyn, SetDefUFSMyn
 local SetManLITyn, SetManLITOOCyn, SetManLITmp, SetManLIThp, SetManLITSAFEyn, SetManELITyn, SetManELITmp, SetManELIThp, SetManDPCyn, SetManDPCOOCyn, SetManDOCPLmp, SetManDOCPEmp, SetManUMPOyn, SetManUMPOmp
 local SetDpsSHB, SetDpsSHBmp, SetDpsSPAyn, SetDpsSFyn, SetDpsMDOli, SetDpsCurse, SetDpsCurseCYyn, SetDpsAMPyn, SetDpsCORyn, SetDpsCORCYyn, SetDpsCORCYr1, SetDpsIMMyn, SetDpsIMMCYyn, SetDpsSLIyn, SetDpsSLICYyn, SetDpsSBUyn 
@@ -901,7 +901,7 @@ end
 -- Damage
 -- OK (Warlock.Rotation)
 local function Damage ()
-		if not Player.Dead then
+	if not Player.Dead then
 		-- Swich to new Target if Target in Fear
 		Target = Player.Target or false
 		if Player.Casting and Player.Casting == Spell.Fear.SpellName and NewTarget then
